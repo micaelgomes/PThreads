@@ -12,7 +12,7 @@
 
 #define a 0
 #define b 29999
-#define TAM 1000
+#define TAM 4
 
 /*  TAM == 10000 => Quant Primes: 10825260
     Time => ./exe serial: 397,95s user - 0,58s system - 99% cpu - 6:41,73 total */
@@ -24,19 +24,24 @@ using namespace std;
 
 int mat[TAM][TAM];
 int quantPrime = 0;
+vector<int> lineVisited(TAM, 0);
 
 void generateRandomMat();
 vector<thread> createThreads(int quantThread);
 bool isPrime(int num);
-void findPrime(int start, int end);
+void findPrime();
+void findPrimeInLine(int line);
 
+void checkPrimeInLine(){
+    int lineNoVisited = 0;
+    while(lineVisited[lineNoVisited] != 0)
+        lineNoVisited++;
 
-void printID(){
-    cout << "Thread ID : " <<std::this_thread::get_id() << endl;
+    lineVisited[lineNoVisited] = 1;
+    findPrimeInLine(lineNoVisited);
 }
 
 int main(int argc, char *argv[]){       
-    int *macroVisited = (int*)calloc(sizeof(int), TAM);
     int quantThread;
     vector<thread> threads;
 
@@ -46,16 +51,44 @@ int main(int argc, char *argv[]){
   
         if(!strcmp(argv[1], "serial")){
             printf("Start!\n");
-            findPrime(0, TAM);
+            findPrime();
         } else if(!strcmp(argv[1], "paralelo")){
             if(argv[2]!=NULL){
                 quantThread = strtol(argv[2], NULL, 10);
                 threads = createThreads(quantThread);
 
-                for(thread & th: threads){
-                    if(th.joinable())
-                        th.join();
+                while(lineVisited[TAM-1] != 0){
+                    for(thread & th: threads){
+                        if(th.joinable())
+                            th.join();
+                    }
                 }
+            }
+        } else if(!strcmp(argv[1], "ambos")){
+            if(argv[2]!=NULL){
+                quantThread = strtol(argv[2], NULL, 10);
+                threads = createThreads(quantThread);
+
+                printf("==========\n");
+                printf("Comparação\n");
+                printf("==========\n");
+                printf("Buscar de forma ::SERIAL::\n");
+                findPrime();
+                printf("Quant Primes: %d\n", quantPrime);
+
+                quantPrime = 0;
+                printf("\n\n==========\n");
+                printf("Buscar de forma ::PARALELA::\n");
+
+                while(lineVisited[TAM-1] != 0){
+                    for(thread & th: threads){
+                        if(th.joinable())
+                            th.join();
+                    }
+                }
+                printf("Quant Primes: %d\n", quantPrime);
+
+                return 0;
             }
         } else {
             printf("Há Argumentos, mas... não consigo entender\n");
@@ -74,10 +107,8 @@ int main(int argc, char *argv[]){
 vector<thread> createThreads(int quantThread){
     vector<thread> threads;
 
-    while(quantThread > 0){
-        threads.push_back(thread(printID));
-        quantThread--;
-    }
+    while(quantThread > 0)
+        threads.push_back(thread(checkPrimeInLine));
 
     return threads;
 }
@@ -102,9 +133,15 @@ void generateRandomMat(){
             mat[i][j] = rand() % b + a;
 }
 
-void findPrime(int start, int end){
-    for(int i=start; i<end; i++)
-        for(int j=start; j<end; j++)
+void findPrime(){
+    for(int i=0; i<TAM; i++)
+        for(int j=0; j<TAM; j++)
             if(isPrime(mat[i][j]))
                 quantPrime = quantPrime + 1;
+}
+
+void findPrimeInLine(int line){
+    for(int i=0; i<TAM; i++)
+        if(isPrime(mat[line][i]))
+            quantPrime = quantPrime + 1;
 }
