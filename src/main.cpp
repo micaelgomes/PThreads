@@ -6,25 +6,22 @@
 
 #include <iostream>
 #include <stdlib.h>
-#include <thread>
-#include <vector>
 #include <string.h>
+#include <vector>
+#include <thread>
+#include <mutex>
 
 #define a 0
 #define b 29999
-#define TAM 4
-
-/*  TAM == 10000 => Quant Primes: 10825260
-    Time => ./exe serial: 397,95s user - 0,58s system - 99% cpu - 6:41,73 total */
-
-/*  TAM == 20000 => Quant Primes: 43301112
-    Time => ./exe serial: 1526,55s user - 2,30s system - 99% cpu - 25:36,03 total */
+#define TAM 100
 
 using namespace std;
 
 int mat[TAM][TAM];
 int quantPrime = 0;
+int quantPrimeThread = 0;
 vector<int> lineVisited(TAM, 0);
+mutex m;
 
 void generateRandomMat();
 vector<thread> createThreads(int quantThread);
@@ -33,15 +30,26 @@ void findPrime();
 void findPrimeInLine(int line);
 
 void checkPrimeInLine(){
-    int lineNoVisited = 0;
-    while(lineVisited[lineNoVisited] != 0)
-        lineNoVisited++;
+    while(true){
+        if(lineVisited[TAM-1] == 1)
+            break;
+        else {
+            m.lock();
+            int line = 0;
+            for(line = 0; line<TAM; line++)
+                if(lineVisited[line] == 0)
+                    break;
 
-    lineVisited[lineNoVisited] = 1;
-    findPrimeInLine(lineNoVisited);
+            if(lineVisited[line] == 0)
+                lineVisited[line] = 1;
+                
+            m.unlock();
+            findPrimeInLine(line);
+        }
+    }
 }
 
-int main(int argc, char *argv[]){       
+int main(int argc, char *argv[]){
     int quantThread;
     vector<thread> threads;
 
@@ -50,49 +58,48 @@ int main(int argc, char *argv[]){
         generateRandomMat();
   
         if(!strcmp(argv[1], "serial")){
-            printf("Start!\n");
+            printf("SERIAL Start!\n");
             findPrime();
         } else if(!strcmp(argv[1], "paralelo")){
             if(argv[2]!=NULL){
+                printf("PARALELO Start!\n");
                 quantThread = strtol(argv[2], NULL, 10);
                 threads = createThreads(quantThread);
 
-                while(lineVisited[TAM-1] != 0){
-                    for(thread & th: threads){
-                        if(th.joinable())
-                            th.join();
-                    }
-                }
+                for(thread & th: threads)
+                    if(th.joinable())
+                        th.join();
+
+                printf("Quant Primes: %d\n", quantPrimeThread);
+                return 0;
+            } else {
+                printf("Há Argumentos, mas... não consigo entender\n");
+                return 0;    
             }
         } else if(!strcmp(argv[1], "ambos")){
             if(argv[2]!=NULL){
                 quantThread = strtol(argv[2], NULL, 10);
                 threads = createThreads(quantThread);
 
-                printf("==========\n");
-                printf("Comparação\n");
-                printf("==========\n");
                 printf("Buscar de forma ::SERIAL::\n");
                 findPrime();
                 printf("Quant Primes: %d\n", quantPrime);
+                // printf("TEMPO SERIAL: %lf\n", timeSerialEnd-timeSerialStart);
 
-                quantPrime = 0;
-                printf("\n\n==========\n");
+                printf("\n==============================\n\n");
                 printf("Buscar de forma ::PARALELA::\n");
-
-                while(lineVisited[TAM-1] != 0){
-                    for(thread & th: threads){
-                        if(th.joinable())
-                            th.join();
-                    }
-                }
-                printf("Quant Primes: %d\n", quantPrime);
-
+                
+                for(thread & th: threads)
+                    if(th.joinable())
+                        th.join();             
+                printf("Quant Primes: %d\n", quantPrimeThread);
+                // printf("TEMPO PARALELO: %lf\n", timeParaleloEnd-timeParaleloStart);
+                
                 return 0;
+            } else {
+                printf("Há Argumentos, mas... não consigo entender\n");
+                return 0;    
             }
-        } else {
-            printf("Há Argumentos, mas... não consigo entender\n");
-            return 0;    
         }
 
         printf("Quant Primes: %d\n", quantPrime);
@@ -107,8 +114,10 @@ int main(int argc, char *argv[]){
 vector<thread> createThreads(int quantThread){
     vector<thread> threads;
 
-    while(quantThread > 0)
+    while(quantThread > 0){
         threads.push_back(thread(checkPrimeInLine));
+        quantThread--;
+    }
 
     return threads;
 }
@@ -143,5 +152,5 @@ void findPrime(){
 void findPrimeInLine(int line){
     for(int i=0; i<TAM; i++)
         if(isPrime(mat[line][i]))
-            quantPrime = quantPrime + 1;
+            quantPrimeThread = quantPrimeThread + 1;        
 }
